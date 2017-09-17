@@ -67,3 +67,11 @@ for i in range(Ne):
 #Matriz tridimensional de matrices de rigidez global de cada elemento    
 MAG = np.zeros(((Ne,4,4)))
 
+MATT = np.zeros((Ne,4,4))
+for i in range (Ne):
+    MATT[i]=MAT[i].transpose()
+
+i = 0
+for i in range(Ne):
+    MAG[i] = MAT[i]*MAL[i]*MATT[i]
+
