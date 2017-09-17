@@ -1,0 +1,69 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Sun Sep 17 17:11:47 2017
+
+@author: Daniela Morales C
+"""
+
+import numpy as np        #Libreria para calculos generales
+import xlrd               #Libreria para leer datos de excel
+
+#Este es el programa para cerchas
+#Datos de entrada
+
+doc = xlrd.open_workbook('Cercha_1.xlsx')
+worksheet = doc.sheet_by_name('Hoja1')
+
+Nnodos = worksheet.cell(1,1)
+Nelements = worksheet.cell(2,1)
+
+Nn = np.int(worksheet.cell_value(1,1)) #numero de nodos
+Ne = np.int(worksheet.cell_value(2,1)) #Numero de elementos
+
+
+MGL = np.zeros((Ne,4))      #Matriz de grados de libertad
+MC = np.zeros((Ne,4))       #Matriz con coordenadas iniciales y finales
+MA = np.zeros((Ne,1))       #Matriz con áreas
+ME = np.zeros((Ne,1))       #Matriz con módulo de elasticidad
+
+i = 0
+j = 0
+for i in range (Ne):
+    for j in range(4):
+        MGL[i,j] = worksheet.cell_value(i+7,j+7)
+        MC[i,j] = worksheet.cell_value(i+7,j+3)
+        MA[i,0] = worksheet.cell_value(i+7,1)
+        ME[i,0] = worksheet.cell_value(i+7,2)
+
+ML = np.zeros((Ne,1))       #Matriz con longitudes de cada elemento
+
+i = 0
+for i in range(Ne):
+    ML[i,0] = ((MC[i,2]-MC[i,0])**2 + (MC[i,3]-MC[i,1])**2)**0.5
+
+     
+#Matriz tridimensional de matrices de rigidez local de cada elemento
+MAL = np.zeros(((Ne,4,4)))       
+
+i = 0
+for i in range(Ne):
+    MAL[i,0,0] = (MA[i,0] * ME[i,0])/ML[i,0]
+    MAL[i,0,2] = -MAL[i,0,0]
+    MAL[i,2,0] = -MAL[i,0,0]
+    MAL[i,2,2] = MAL[i,0,0]    
+    
+
+#Matriz tridimensional de matrices de transfromación de cada elemento
+MAT = np.zeros(((Ne,4,4)))
+
+i = 0
+for i in range(Ne):
+    MAT[i,0,0] = (MC[i,2]-MC[i,0])/ML[i,0]
+    MAT[i,1,0] = (MC[i,3]-MC[i,1])/ML[i,0]
+    MAT[i,2,2] = MAT[i,0,0]
+    MAT[i,3,2] = MAT[i,1,0]
+
+
+#Matriz tridimensional de matrices de rigidez global de cada elemento    
+MAG = np.zeros(((Ne,4,4)))
+
