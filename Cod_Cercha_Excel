@@ -47,7 +47,7 @@ MAL = np.zeros(((Ne,4,4)))
 
 i = 0
 for i in range(Ne):
-    MAL[i,0,0] = (MA[i,0] * ME[i,0])/ML[i,0]
+    MAL[i,0,0] = (MA[i,0]*ME[i,0])/ML[i,0]
     MAL[i,0,2] = -MAL[i,0,0]
     MAL[i,2,0] = -MAL[i,0,0]
     MAL[i,2,2] = MAL[i,0,0]    
@@ -64,14 +64,38 @@ for i in range(Ne):
     MAT[i,3,2] = MAT[i,1,0]
 
 
-#Matriz tridimensional de matrices de rigidez global de cada elemento    
+#Matriz tridimensional de matrices de rigidez global de cada elemento 
+  
 MAG = np.zeros(((Ne,4,4)))
-
+MAG1 = np.zeros(((Ne,4,4)))
 MATT = np.zeros((Ne,4,4))
+
 for i in range (Ne):
     MATT[i]=MAT[i].transpose()
 
 i = 0
 for i in range(Ne):
-    MAG[i] = MAT[i]*MAL[i]*MATT[i]
+    MAG1[i] = (MAT[i]).dot(MAL[i])
+    MAG[i] = (MAG1[i]).dot(MATT[i])
+
+#Matriz de rigidez global de la estructura
+
+KG = np.zeros((13,13))
+
+i = 0
+j = 0
+k = 0
+for i in range(Ne):
+    for j in range(4):
+        for k in range(4):
+            x = int(MGL[i,j])
+            y = int(MGL[i,k])
+            KG[x,y] = KG[x,y]+MAG[i,k,j]
+            x = 0
+            y = 0
+        
+
+
+
+
 
