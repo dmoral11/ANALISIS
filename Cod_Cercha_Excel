@@ -19,17 +19,22 @@ Nelements = worksheet.cell(2,1)
 
 Nn = np.int(worksheet.cell_value(1,1)) #numero de nodos
 Ne = np.int(worksheet.cell_value(2,1)) #Numero de elementos
+GL = np.int(worksheet.cell_value(1,4)) #Numero de grados de libertad
+GLE = np.int(worksheet.cell_value(2,4)) #Numero de grados de libertad de cada elemento
+NGLL = np.int(worksheet.cell_value(1,7)) #Numero de grados de libertad libres
+NGLR = np.int(worksheet.cell_value(2,7)) #Numero de grados de libertad restringidos
 
 
-MGL = np.zeros((Ne,4))      #Matriz de grados de libertad
-MC = np.zeros((Ne,4))       #Matriz con coordenadas iniciales y finales
+
+MGL = np.zeros((Ne,GLE))      #Matriz de grados de libertad
+MC = np.zeros((Ne,GLE))       #Matriz con coordenadas iniciales y finales
 MA = np.zeros((Ne,1))       #Matriz con áreas
 ME = np.zeros((Ne,1))       #Matriz con módulo de elasticidad
 
 i = 0
 j = 0
 for i in range (Ne):
-    for j in range(4):
+    for j in range(GLE):
         MGL[i,j] = worksheet.cell_value(i+7,j+7)
         MC[i,j] = worksheet.cell_value(i+7,j+3)
         MA[i,0] = worksheet.cell_value(i+7,1)
@@ -54,7 +59,7 @@ for i in range(Ne):
     
 
 #Matriz tridimensional de matrices de transfromación de cada elemento
-MAT = np.zeros(((Ne,4,4)))
+MAT = np.zeros(((Ne,GLE,GLE)))
 
 i = 0
 for i in range(Ne):
@@ -66,9 +71,9 @@ for i in range(Ne):
 
 #Matriz tridimensional de matrices de rigidez global de cada elemento 
   
-MAG = np.zeros(((Ne,4,4)))
-MAG1 = np.zeros(((Ne,4,4)))
-MATT = np.zeros((Ne,4,4))
+MAG = np.zeros(((Ne,GLE,GLE)))
+MAG1 = np.zeros(((Ne,GLE,GLE)))
+MATT = np.zeros((Ne,GLE,GLE))
 
 for i in range (Ne):
     MATT[i]=MAT[i].transpose()
@@ -86,13 +91,96 @@ i = 0
 j = 0
 k = 0
 for i in range(Ne):
-    for j in range(4):
-        for k in range(4):
+    for j in range(GLE):
+        for k in range(GLE):
             x = int(MGL[i,j]-1)
             y = int(MGL[i,k]-1)
             KG[x,y] = KG[x,y] + MAG[i,j,k]
             
+
+K0 = np.zeros((NGLL,NGLL))
+K1 = np.zeros((NGLL,NGLR))
+K2 = np.zeros((NGLR,NGLL))
+K3 = np.zeros((NGLR,NGLR))
+
+
+i = 0
+j = 0
+for i in range (NGLL):
+    for j in range(NGLL):
+        K0[i,j] = KG[i,j]
+
+i = 0
+j = 0
+for i in range (NGLL):
+    for j in range(NGLL, NGLL + NGLR):
+        K1[i,(j-NGLL)] = KG[i,j]
+
+
+i = 0
+j = 0
+for i in range(NGLL, NGLR + NGLL):
+    for j in range(NGLL):
+        K2[(i-NGLL),j] = KG[i,j]     
         
 
+i = 0
+j = 0
+for i in range(NGLL, NGLR + NGLL):
+    for j in range(NGLL, NGLR + NGLL):
+        K3[(i-NGLL),(j-NGLL)] = KG[i,j]
 
 
+F0 = np.zeros((NGLL,1))
+
+i = 0
+for i in range (NGLL):
+    F0[i,0] = worksheet.cell_value(20+i,1)
+
+
+
+
+U1 = np.zeros((NGLR,1))
+
+i = 0
+for i in range (NGLR):
+    U1[i,0] = worksheet.cell_value(29+i,2)
+    
+Feff = F0 - ((K1).dot(U1))
+
+K0_inv = np.linalg.inv(K0)
+U0 = (K0_inv).dot(Feff)
+F1 = (K2).dot(U0) + (K3).dot(U1)
+
+
+U = np.concatenate((U0, U1), axis=0)
+
+MU = np.zeros(((Ne,GLE,1)))
+
+i = 0
+j = 0
+x = 0
+for i in range(Ne):
+    for j in range(GLE):
+        x = int(MGL[i,j]-1)
+        MU[i,j,0] = U[x,0]
+        
+MFG = np.zeros(((Ne,GLE,1)))
+
+i = 0
+for i in range(Ne):
+    MFG[i] = (MAG[i]).dot(MU[i])
+    
+MFL = np.zeros(((Ne,GLE,1)))
+
+i = 0
+for i in range(Ne):
+    MFL[i] = (MATT[i]).dot(MFG[i])
+
+FELEM = np.zeros((Ne,1))
+
+i = 0
+for i in range(Ne):
+    FELEM[i,0] = -MFL[i,0,0]
+    
+  
