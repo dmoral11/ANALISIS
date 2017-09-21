@@ -80,7 +80,7 @@ for i in range(Ne):
 
 #Matriz de rigidez global de la estructura
 
-KG = np.zeros((13,13))
+KG = np.zeros((12,12))
 
 i = 0
 j = 0
@@ -88,14 +88,11 @@ k = 0
 for i in range(Ne):
     for j in range(4):
         for k in range(4):
-            x = int(MGL[i,j])
-            y = int(MGL[i,k])
-            KG[x,y] = KG[x,y]+MAG[i,k,j]
-            x = 0
-            y = 0
+            x = int(MGL[i,j]-1)
+            y = int(MGL[i,k]-1)
+            KG[x,y] = KG[x,y] + MAG[i,j,k]
+            
         
-
-
 
 
 
