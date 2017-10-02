@@ -1,0 +1,375 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Thu Mar 16 15:15:21 2017
+
+@author: usuario
+"""
+
+print(" Programa para analizar un portico en 2D ") #En el siguiente se analizara la matriz de rigidez de un portico 
+
+import xlrd  #para exportar a excel y permite modificar en excel 
+import xlwt      # Para escribir en excel 
+import numpy as np #biblioteca para trabajar con arreglos
+from numpy.linalg import inv #biblioteca para operadores matematicos 
+
+doc = xlrd. open_workbook("Portico.xlsx")  #LLama al documento desde excel
+worksheet = doc.sheet_by_name("Hoja1") #llama la hoja en la que tengo los dato
+
+Nn = np.int(worksheet.cell_value(1,1)) #numero de nodos
+Ne = np.int(worksheet.cell_value(2,1)) #Numero de elementos
+
+Gle = np.int(worksheet.cell_value(3,1)) #Grados de libertad por elementos
+Glestructura = np.int(worksheet.cell_value(4,1))
+Gllibres = np.int(worksheet.cell_value(5,1))
+
+MA = np.zeros((Ne,1))       #En este ciclo importo la matriz de areas a python
+for i in range (0,Ne):
+    MA[i,0]= (worksheet.cell_value(8+i,1))
+print("la matriz de areas es:" , MA)
+
+ME = np.zeros((Ne,1))     #En este ciclo importamos la matriz de modulos de elasticidad 
+for i in range (0,Ne):
+    ME[i,0]= (worksheet.cell_value(8+i,2))
+    
+print("la matriz de modulo de elasticidad es:" , ME)  
+
+MI = np.zeros((Ne,1))  #En este ciclo importamos la matriz de inercias de cada elemento
+for i in range (0,Ne):
+    MI[i,0] = (worksheet.cell_value(8+i,3))
+print("la matriz de inercias de cada elemento es:" , MI)  
+
+MGL = np.zeros((Ne,Gle))  #En este ciclo importamos la matriz de grados de libertad 
+for i in range (0,Ne):
+    for j in range (0,Gle):
+       MGL[i,j]= (worksheet.cell_value(8+i,8+j))
+print ("la matriz de grados de libertad es:", MGL)
+
+MC=np.zeros((Ne,4)) #Matriz de coordenadas (mm), el tamaño de esta matriz esta definido por el numero de elementos y el numero de grados de libertad que en cerchas siempre sera 4 por elementos 
+for i in range (0,Ne):
+    for j in range (0,4):
+        MC[i,j]=(worksheet.cell_value(8+i,4+j))
+print("la matriz de coordenadas es:" , MC)
+
+ML=np.zeros((Ne,1)) #Matriz con longitudes de cada elemento   
+for i in range (0,Ne):
+    ML[i,0]=(((MC[i,2]-MC[i,0])**2)+((MC[i,3]-MC[i,1])**2))**0.5
+    
+print("la matriz de longitudes es:" , ML)
+
+#En el siguiente ciclo ensamblamos la matriz de rigidez de cada elemento 
+MAL = np.zeros((Ne,6,6)) #Es de tamaño 6x6 por que son el numero de grados de libertad por elemento en un portico de 2D
+for i in range (0,Ne):
+    MAL[i,0,0]=np.dot(MA[i,0],ME[i,0]/ML[i,0])
+    MAL[i,0,3]= -MAL[i,0,0]
+    MAL[i,3,0]= -MAL[i,0,0]
+    MAL[i,3,3]= MAL[i,0,0]
+    MAL[i,1,1]=(12*np.dot(ME[i,0],MI[i,0])/(ML[i,0]**3))
+    MAL[i,1,4]= -MAL[i,1,1]
+    MAL[i,4,1]= -MAL[i,1,1]
+    MAL[i,4,4]= MAL[i,1,1]
+    MAL[i,1,2]= (6*np.dot(ME[i,0],MI[i,0])/(ML[i,0]**2))
+    MAL[i,2,1]= MAL[i,1,2]
+    MAL[i,1,5]= MAL[i,1,2]
+    MAL[i,2,4]= -MAL[i,1,2]
+    MAL[i,4,2]= -MAL[i,1,2]
+    MAL[i,5,1]= MAL[i,1,2]
+    MAL[i,4,5]= -MAL[i,1,2]
+    MAL[i,5,4]=-MAL[i,1,2]
+    MAL[i,2,2]= (4*np.dot(ME[i,0],MI[i,0])/(ML[i,0]))
+    MAL[i,5,5]=  MAL[i,2,2]
+    MAL[i,5,2]= (2*np.dot(ME[i,0],MI[i,0])/(ML[i,0]))
+    MAL[i,2,5]= MAL[i,5,2]
+print ("la matriz de rigidez local de cada elemento es:", MAL)
+
+#En el siguiente ciclo ensamblamos la matriz de transformacion 
+MAT = np.zeros((Ne,6,6)) #Es de tamaño 6x6 por que son el numero de grados de libertad por elemento en un portico de 2D
+for i in range (0,Ne):
+    MAT[i,0,0]=[MC[i,2]-MC[i,0]]/ML[i,0]
+    MAT[i,1,0]=[MC[i,3]-MC[i,1]]/ML[i,0]
+    MAT[i,1,1]=MAT[i,0,0]
+    MAT[i,0,1]=-MAT[i,1,0]
+    MAT[i,2,2]= 1
+    MAT[i,3,3]= MAT[i,0,0]
+    MAT[i,3,4]=-MAT[i,1,0]
+    MAT[i,4,4]=MAT[i,0,0]
+    MAT[i,4,3]=MAT[i,1,0]
+    MAT[i,5,5]=1
+print("la matriz de transformacion de cada elemento es :",MAT)
+
+
+MATT=np.zeros((Ne,6,6))
+for i in range (Ne):
+    MATT[i]=MAT[i].transpose()
+    
+#En el siguiente ciclo ensamblamos la matriz de rigiz global de cada elemento
+MAG = np.zeros((Ne,6,6)) #Es de tamaño 6x6 por que son el numero de grados de libertad por elemento en un portico de 2D
+for i in range(0,Ne):
+    MAG[i]=np.dot(np.dot(MAT[i],MAL[i]),MATT[i])
+    
+print ("la matriz de rigidez de cada elemento en coordenadas globales es:",MAG)
+
+#En este ciclo ensamblamos la matriz de rigidez global de la estructura
+KG = np.zeros((Glestructura,Glestructura))
+for i in range (0,Ne):
+    for j in range (0,6):
+        for k in range (0,6):
+            KG[MGL[i,j]-1,MGL[i,k]-1]=KG[MGL[i,j]-1,MGL[i,k]-1] + MAG[i,j,k]
+
+print("la matriz de rigidez global de la estructura es:",KG)
+
+#Generacion del vector {F}={N}-{L} 
+
+N0= np.zeros((Gllibres,1))
+for i in range (0,Gllibres): #En este ciclo importamos de excel la matriz de las fuerzas externas conocidas  en los nodos 
+    N0[i]=(worksheet.cell_value(7+i,16))
+print("la matriz de fuerzas conocidas en los nodos de la estructura es:",N0)
+
+MLL=np.zeros((Ne,Gle,1))
+
+for i in range(0,Ne): #En este ciclo importamos de excel la matriz de las cargas en las luces y las unimos en una matriz 
+ for j in range(0,Gle): 
+    MLL[i,j,0]=(worksheet.cell_value(7+i,17+j))
+print("la matriz de fuerzas en las luces de los elementos es:",MLL)
+
+#MLG: Matriz de almacenamiento de reacciones de empotramiento en coordenadas globales de cada elemento 
+MLG=np.zeros((Ne,Gle,1))
+for i in range (0,Ne): #En este ciclo se halla el vector de reacciones de empotramiento en coordenadas globales
+    MLG[i]=np.dot(MAT[i],MLL[i])
+print("El vector de reacciones de empotramiento en coordenadas globales es:",MLG)
+
+L=np.zeros((Glestructura,1))
+for i in range (0,Ne):
+    for j in range(0,Gle):
+        L[MGL[i,j]-1,0]= L[MGL[i,j]-1,0]+MLG[i,j,0]
+L0= L[0:Gllibres]
+L1= L[Gllibres:Glestructura]
+print("El vector de reacciones de empotramiento en coordenadas globales es:",L)
+
+F0=np.zeros((Gllibres,1))
+
+for i in range (Gllibres):
+    F0[i,0]=N0[i,0]-L0[i,0]
+    
+print("El vector de fuerzas conocidas es:",F0)
+
+U1=np.zeros((Glestructura-Gllibres,1))
+for i in range(Glestructura-Gllibres):
+    U1[i,0]=worksheet.cell_value(Gllibres+7+i,23)
+    
+print ("El vector de desplazamientos conocidos es:",U1)
+
+
+K0=KG[0:Gllibres,0:Gllibres]
+K1=KG[0:Gllibres,Gllibres:Glestructura]
+K2=KG[Gllibres:Glestructura,0:Gllibres]
+K3=KG[Gllibres:Glestructura,Gllibres:Glestructura]
+
+Feff= F0-np.dot(K1,U1)
+U0= np.dot(np.linalg.inv(K0),Feff)
+F1= (np.dot(K2,U0))+(np.dot(K3,U1))
+print("la matriz de desplazamientos  en los grados de libertad libre es :",U0)
+print("la matriz de reacciones en los nodos es :",F1) #Teniendo en cuenta nodos + luces 
+
+#Para encontrar reacciones
+N1=F1+L1
+
+#Ciclo para unir U0 y U1 en U
+U=np.zeros((Glestructura,1))
+
+for i in range (0,Gllibres):
+    U[i,0]=U0[i,0]
+
+for i in range (0,Glestructura-Gllibres):
+    U[i+Gllibres,0]=U1[i,0]
+print("El vector de desplazamientos es :",U)
+
+#En este ciclo se crea la matriz de almacenamiento de desplazamientos de cada elemento 
+MU=np.zeros((Ne,6,1))
+for i in range (0,Ne):
+    for j in range(0,6):
+        MU[i,j,0]= U[MGL[i,j]-1,0]
+print("la matriz de desplazamiento de cada elemento es :",MU)
+#En este ciclo se ensambla la matriz de almacenamiento de fuerzas internas globales de cada elemento 
+MFG=np.zeros((Ne,6,1))
+for i in range (Ne):
+    MFG[i]=np.dot(MAG[i],MU[i])
+
+print("la matriz de fuerzas internas globales de cada elemento es :",MU)
+#En este ciclo se almacena los vectores N de cada elemento 
+MN=np.zeros((Ne,6,1))
+for i in range (0,Ne):
+    MN[i]=MLG[i]+MFG[i]
+print("El vector de N de cada elemento es :",MN)    
+
+#Matriz de almacenamiento de fuerzas internas locales de cada elemento
+MFL=np.zeros((Ne,6,1))
+for i in range (0,Ne):
+    MFL[i]=np.dot(MATT[i],MN[i])
+print("la matriz de fuerzas internas locales de cada elemento es :",MFL)
+
+#Apoyos Flexibles , cuando uno de los apoyos pasa de ser rigidos a flexibles mediante las constantes de resortes
+
+#KR=np.zeros((Glestructura,1))#En este ciclo llamo de excel la matriz de rigidez de los resortes
+#for i in range (0,Gllibres):
+#    KR[i]= (worksheet.cell_value(7+i,24))
+#print ('la matriz de rigidez de los resortes asociados a los grados de libertad libres es:', KR )
+#
+#for i in range (0,Glestructura):
+#    KG[i,i]=KG[i,i]+KR[i,0]
+##Matriz de rigidez global afectada por los resortes.
+#print('la matriz de rigidez global afectada por los resortes:', KG)
+
+#En este codigo se hallan las fuerzas en las luces que hayan en los elementos partiendo fi(fuerzas locales dadas en los elementos) y Uc(Desplazamientos desconocidos pero que nos lo dan en el problema)
+#Si los ejes locales de un elemento son iguales a los ejes globales entonces f[i]=N[i]
+#fi= np.zeros((Ne,Gle,1)) #fuerzas internas locales dadas en el problema
+#for i in range(0,Ne):
+#    for j in range(0,Gle):
+#     fi[i,j,0]=(worksheet.cell_value(36+i,1+j))
+#
+#Uc= np.zeros((Ne,Gle,1)) #Uc=U0,desplazamientos desconocidos
+#for i in range (0,Ne):
+#    for j in range (0,Gle):
+#      Uc[i,j,0]=(worksheet.cell_value(36+i,10+j))
+# 
+#P=np.zeros((Ne,Gle,1)) #Hallamos la fuerza con F=KxDelta 
+#for i in range(0,Ne):
+#    P[i]=np.dot(MAL[i],Uc[i])
+#    
+#Li=np.zeros((Ne,Gle,1))
+#for i in range (0,Ne):
+#    Li[i]=fi[i]-P[i]
+#
+#    
+#MATTI=np.zeros((Ne,6,6))#Invertimos la matriz de transformacion transpuesta 
+#MATTI=np.linalg.inv(MATT)
+#
+
+
+
+
+#RESPUESTAS EN EXCEL
+
+ar = xlwt.Workbook()
+hoja = ar.add_sheet("K GLOBAL") 
+hoja1=ar.add_sheet("K Global Cada Elemento") 
+hoja2=ar.add_sheet("k Local Cada Elemento")
+hoja3=ar.add_sheet("Desplazamientos y Reacciones")
+hoja4=ar.add_sheet("Fuerzas Internas Elementos ")
+
+style0= xlwt.easyxf('font: name Times New Roman, colour red, bold on ;align: vert centre, horz center')
+style1= xlwt.easyxf('font: name Times New Roman, colour red, bold on ;align: vert centre, horz right')
+style2= xlwt.easyxf('font: name Times New Roman, colour red, bold on ;align: vert centre, horz left')
+style3= xlwt.easyxf('font: name Times New Roman, colour blue, bold on ;align: vert centre, horz center')
+
+hoja.write(0,Glestructura/2,"PORTICO ANALISIS",style0)    
+hoja.write(2,Glestructura/2,"K GLOBAL", style0)
+
+
+
+for i in range (Glestructura):
+    hoja.write(4,i,1+i, style0)
+    
+hoja.write(3,0,"KGLOBAL")
+    
+for i in range(Glestructura):
+    for j in range(Glestructura):
+        hoja.write(6+i,j,round(KG[i,j],2))
+
+for j in range (Glestructura):
+    hoja.write(6+j,Glestructura+1,j+1, style0)
+
+#Imprimir k globales de cada elemento en hoja de excel
+hoja1.write(1,5,"k Globales de cada Elemento", style0)
+
+
+
+s=0
+for i in range (Ne):
+    hoja1.write(4+s,0,"K", style1)
+    hoja1.write(4+s,1,i+1,style2)
+    for j in range (0,6):
+        for k in range (0,6):
+            hoja1.write(2+j+s,2+k,round(MAG[i,j,k],2))
+    s=s+8
+    
+#Imprimir k locales de cada elemento en hoja de excel
+hoja2.write(1,5,"k locales de cada Elemento", style0)
+
+
+
+s=0
+for i in range (Ne):
+    hoja2.write(4+s,0,"k", style1)
+    hoja2.write(4+s,1,i+1,style2)
+    for j in range (0,6):
+        for k in range (0,6):
+            hoja2.write(2+j+s,2+k,round(MAL[i,j,k],2))
+    s=s+8
+#Imprimir resultados de Desplazamientos y Reacciones en excel
+hoja3.write(1,2,"Desplazamientos", style0)
+hoja3.write(1,6,"Reacciones", style0)
+
+for i in range (0,Gllibres):
+    hoja3.write(3+i,0,"U", style1)
+    hoja3.write(3+i,1,i+1,style2)
+    hoja3.write(3+i,2,round(U0[i,0],7))
+for i in range (0,Glestructura-Gllibres):
+    hoja3.write(3+i,4,"R", style1)
+    hoja3.write(3+i,5,i+Gllibres+1,style2)
+    hoja3.write(3+i,6,1000*round(N1[i,0],7))
+
+hoja4.write(1,2,"Desplazamientos de Cada Elemento", style0)
+
+
+#Imprimir resultados de fuerzas internas globales y locales de cada elemento
+
+s=0
+for i in range (Ne):
+    for j in range(6):
+        hoja4.write(2+j+s,3,round(MGL[i,j],2), style3)
+    s=s+8
+s=0
+for i in range (Ne):
+    for j in range(6):
+        hoja4.write(2+j+s,2,round(MU[i,j,0],7))
+    s=s+8
+s=0
+for i in range (Ne):
+    hoja4.write(4+s,0,"U", style1)
+    hoja4.write(4+s,1,i+1,style2)
+    s=s+8
+    
+hoja4.write(1,8,"Fuerzas Internas Globales de Cada Elemento", style0)
+
+s=0
+for i in range (Ne):
+    for j in range(6):
+        hoja4.write(2+j+s,9,round(MGL[i,j],1), style3)
+    s=s+8
+s=0
+for i in range (Ne):
+    for j in range(6):
+        hoja4.write(2+j+s,8,round(MFG[i,j,0],7))
+    s=s+8
+s=0
+for i in range (Ne):
+    hoja4.write(4+s,6,"F", style1)
+    hoja4.write(4+s,7,i+1,style2)
+    s=s+8
+
+
+hoja4.write(1,14,"Fuerzas Internas Locales de Cada Elemento", style0)
+
+s=0
+for i in range (Ne):
+    for j in range(6):
+        hoja4.write(2+j+s,14,1000*round(MFL[i,j,0],7))
+    s=s+8
+s=0
+for i in range (Ne):
+    hoja4.write(4+s,12,"f", style1)
+    hoja4.write(4+s,13,i+1,style2)
+    s=s+8    
+
+ar.save('resultados Portico.xlsx')
+
