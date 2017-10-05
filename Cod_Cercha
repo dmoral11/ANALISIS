@@ -11,7 +11,7 @@ import xlrd               #Libreria para leer datos de excel
 #Este es el programa para cerchas
 #Datos de entrada
 
-doc = xlrd.open_workbook('Cercha_1.xlsx')
+doc = xlrd.open_workbook('Cercha_4.xlsx')
 worksheet = doc.sheet_by_name('Hoja1')
 
 Nnodos = worksheet.cell(1,1)
@@ -27,7 +27,7 @@ NGLR = np.int(worksheet.cell_value(2,7)) #Numero de grados de libertad restringi
 
 
 MGL = np.zeros((Ne,GLE))      #Matriz de grados de libertad
-MC = np.zeros((Ne,GLE))       #Matriz con coordenadas iniciales y finales
+MC = np.zeros((Ne,4))       #Matriz con coordenadas iniciales y finales
 MA = np.zeros((Ne,1))       #Matriz con áreas
 ME = np.zeros((Ne,1))       #Matriz con módulo de elasticidad
 
@@ -76,7 +76,7 @@ MAG1 = np.zeros(((Ne,GLE,GLE)))
 MATT = np.zeros((Ne,GLE,GLE))
 
 for i in range (Ne):
-    MATT[i]=MAT[i].transpose()
+    MATT[i] = MAT[i].transpose()
 
 i = 0
 for i in range(Ne):
@@ -85,7 +85,7 @@ for i in range(Ne):
 
 #Matriz de rigidez global de la estructura
 
-KG = np.zeros((12,12))
+KG = np.zeros((GL,GL))
 
 i = 0
 j = 0
@@ -98,37 +98,14 @@ for i in range(Ne):
             KG[x,y] = KG[x,y] + MAG[i,j,k]
             
 
-K0 = np.zeros((NGLL,NGLL))
-K1 = np.zeros((NGLL,NGLR))
-K2 = np.zeros((NGLR,NGLL))
-K3 = np.zeros((NGLR,NGLR))
 
 
-i = 0
-j = 0
-for i in range (NGLL):
-    for j in range(NGLL):
-        K0[i,j] = KG[i,j]
-
-i = 0
-j = 0
-for i in range (NGLL):
-    for j in range(NGLL, NGLL + NGLR):
-        K1[i,(j-NGLL)] = KG[i,j]
+K0 = KG[0:NGLL,0:NGLL]
+K1 = KG[0:NGLL,NGLL:GL]
+K2 = KG[NGLL:GL,0:NGLL]
+K3 = KG[NGLL:GL,NGLL:GL]
 
 
-i = 0
-j = 0
-for i in range(NGLL, NGLR + NGLL):
-    for j in range(NGLL):
-        K2[(i-NGLL),j] = KG[i,j]     
-        
-
-i = 0
-j = 0
-for i in range(NGLL, NGLR + NGLL):
-    for j in range(NGLL, NGLR + NGLL):
-        K3[(i-NGLL),(j-NGLL)] = KG[i,j]
 
 
 F0 = np.zeros((NGLL,1))
@@ -182,5 +159,8 @@ FELEM = np.zeros((Ne,1))
 i = 0
 for i in range(Ne):
     FELEM[i,0] = -MFL[i,0,0]
-    
-  
+
+
+
+
+
