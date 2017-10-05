@@ -1,0 +1,248 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Sun Sep 17 21:57:16 2017
+
+@author: Daniela Morales C
+"""
+
+import numpy as np        #Libreria para calculos generales
+import xlrd               #Libreria para leer datos de excel
+
+#Este es el programa para porticos
+#Datos de entrada
+
+doc = xlrd.open_workbook('Portico_4.xlsx')
+worksheet = doc.sheet_by_name('Hoja1')
+
+Nnodos = worksheet.cell(1,1)
+Nelements = worksheet.cell(2,1)
+
+Nn = np.int(worksheet.cell_value(1,1)) #numero de nodos
+Ne = np.int(worksheet.cell_value(2,1)) #Numero de elementos
+GL = np.int(worksheet.cell_value(1,4)) #Numero de grados de libertad
+GLE = np.int(worksheet.cell_value(2,4)) #Numero de grados de libertad de cada elemento
+NGLL = np.int(worksheet.cell_value(1,7)) #Numero de grados de libertad libres
+NGLR = np.int(worksheet.cell_value(2,7)) #Numero de grados de libertad restringidos
+
+MGL = np.zeros((Ne,GLE))      #Matriz de grados de libertad
+MC = np.zeros((Ne,4))       #Matriz con coordenadas iniciales y finales
+MA = np.zeros((Ne,1))       #Matriz con áreas
+ME = np.zeros((Ne,1))       #Matriz con módulo de elasticidad
+MI = np.zeros((Ne,1))       #Matriz de inercias
+
+i = 0
+j = 0
+for i in range (Ne): 
+    for j in range(GLE):
+        MGL[i,j] = worksheet.cell_value(i+7,j+8)
+        MA[i,0] = worksheet.cell_value(i+7,1)
+        ME[i,0] = worksheet.cell_value(i+7,2)
+        MI[i,0] = worksheet.cell_value(i+7,3)
+
+i = 0
+j = 0
+for i in range (Ne):
+    for j in range(4):
+        MC[i,j] = worksheet.cell_value(i+7,j+4)
+
+
+
+ML = np.zeros((Ne,1))       #Matriz con longitudes de cada elemento
+
+i = 0
+for i in range(Ne):
+    ML[i,0] = ((MC[i,2]-MC[i,0])**2 + (MC[i,3]-MC[i,1])**2)**0.5
+
+
+#Matriz tridimensional de matrices de rigidez local de cada elemento
+MAL = np.zeros(((Ne,6,6)))       
+
+i = 0
+for i in range(Ne):
+    MAL[i,0,0] = (MA[i,0]*ME[i,0])/ML[i,0]
+    MAL[i,0,3] = -MAL[i,0,0]
+    MAL[i,3,0] = -MAL[i,0,0]
+    MAL[i,3,3] = MAL[i,0,0]
+    MAL[i,1,1] = (12*ME[i,0]*MI[i,0])/(ML[i,0]**3)
+    MAL[i,1,4] = -MAL[i,1,1]
+    MAL[i,4,1] = -MAL[i,1,1]
+    MAL[i,4,4] = MAL[i,1,1]
+    MAL[i,1,2] = (6*ME[i,0]*MI[i,0])/(ML[i,0]**2)
+    MAL[i,2,1] = MAL[i,1,2]
+    MAL[i,1,5] = MAL[i,1,2]
+    MAL[i,2,4] = -MAL[i,1,2]
+    MAL[i,4,2] = -MAL[i,1,2]
+    MAL[i,5,1] = MAL[i,1,2]
+    MAL[i,4,5] = -MAL[i,1,2]
+    MAL[i,5,4] = -MAL[i,1,2]
+    MAL[i,2,2] = (4*ME[i,0]*MI[i,0])/(ML[i,0])
+    MAL[i,5,5] = MAL[i,2,2]
+    MAL[i,5,2] = (2*ME[i,0]*MI[i,0])/(ML[i,0])
+    MAL[i,2,5] = MAL[i,5,2]
+
+
+#Matriz tridimensional de matrices de transfromación de cada elemento
+MAT = np.zeros(((Ne,GLE,GLE)))
+
+i = 0
+for i in range(Ne):
+    MAT[i,0,0] = (MC[i,2]-MC[i,0])/ML[i,0]
+    MAT[i,1,0] = (MC[i,3]-MC[i,1])/ML[i,0]
+    MAT[i,1,1] = MAT[i,0,0]
+    MAT[i,0,1] = -MAT[i,1,0]
+    MAT[i,2,2] = 1
+    MAT[i,3,3] = MAT[i,0,0]
+    MAT[i,3,4] = -MAT[i,1,0]
+    MAT[i,4,4] = MAT[i,0,0]
+    MAT[i,4,3] = MAT[i,1,0]
+    MAT[i,5,5] = 1
+
+#Matriz tridimensional de matrices de rigidez global de cada elemento 
+  
+MAG = np.zeros(((Ne,GLE,GLE)))
+MAG1 = np.zeros(((Ne,GLE,GLE)))
+MATT = np.zeros((Ne,GLE,GLE))
+
+for i in range (Ne):
+    MATT[i]=MAT[i].transpose()
+
+i = 0
+for i in range(Ne):
+    MAG1[i] = (MAT[i]).dot(MAL[i])
+    MAG[i] = (MAG1[i]).dot(MATT[i])
+
+
+
+#Matriz de rigidez global de la estructura
+KG1 = np.zeros((GL,GL))
+KG = np.zeros((GL,GL))
+
+i = 0
+j = 0
+k = 0
+for i in range(Ne):
+    for j in range(GLE):
+        for k in range(GLE):
+            x = int(MGL[i,j]-1)
+            y = int(MGL[i,k]-1)
+            KG1[x,y] = KG1[x,y] + MAG[i,j,k]
+            KG[x,y] = KG1[x,y]*1000
+              
+
+
+K0 = KG[0:NGLL,0:NGLL]
+K1 = KG[0:NGLL,NGLL:GL]
+K2 = KG[NGLL:GL,0:NGLL]
+K3 = KG[NGLL:GL,NGLL:GL]
+
+
+              
+
+#Vector de cargas aplicadas en los nodos
+N0 = np.zeros((NGLL,1))
+
+i = 0 
+for i in range(NGLL):
+    N0[i,0] = worksheet.cell_value(i+7,17) 
+
+
+#Matriz tridimensional de almacenamiento reacciones de empotramiento en coordenadas locales de cada elemento 
+  
+MLL = np.zeros(((Ne,GLE,1)))
+
+i = 0
+j = 0
+for i in range(Ne):
+    for j in range(GLE):
+        MLL[i,j,0] = worksheet.cell_value(i+7,19+j)
+        
+
+
+#Matriz tridimensional de almacenamiento de reacciones de empotramiento en coordenadas globales de cada elemento 
+  
+MLG = np.zeros(((Ne,GLE,1)))
+for i in range(Ne):
+    MLG[i] = (MAT[i]).dot(MLL[i])
+
+#Vector de reacciones de empotramiento en coordenadas globales
+L = np.zeros((GL,1))
+
+i = 0
+j = 0
+x = 0
+for i in range(Ne):
+    for j in range(GLE):
+        x = int(MGL[i,j]-1)
+        L[x,0] = L[x,0] + MLG[i,j,0]
+        
+L0= L[0:NGLL]
+L1= L[NGLL:GL]
+
+
+#Cargas en los nodos
+F0 = np.zeros((NGLL,1))
+
+i = 0
+for i in range(NGLL):
+    F0[i] = N0[i] - L0[i]
+
+
+#Desplazamientos en los nodos
+U1 = np.zeros((NGLR,1))
+
+i = 0
+for i in range(NGLR):
+    U1[i,0] = worksheet.cell_value(NGLL+7+i,18)
+
+Feff = F0 - ((K1).dot(U1))
+
+K0_inv = np.linalg.inv(K0)
+U10 = (K0_inv).dot(Feff)
+U0 = 1000 * U10
+F10 = (K2).dot(U0) + (K3).dot(U1)        
+F1 = F10/1000
+
+
+#Vector de reacciones
+N1 = F1 + L1
+
+#Vector de desplazamiento de los grados de libertad de cada elemento
+U = np.concatenate((U0, U1), axis=0)
+
+
+#Matriz de almacenamiento de desplazamiento de cada elemento
+MU = np.zeros(((Ne,GLE,1)))
+
+i = 0
+j = 0
+x = 0
+for i in range(Ne):
+    for j in range(GLE):
+        x = int(MGL[i,j]-1)
+        MU[i,j,0] = U[x,0]
+ 
+#Matriz de almacenamiento de fuerzas internas globales de cada elemento       
+MFG = np.zeros(((Ne,GLE,1)))
+
+i = 0
+for i in range(Ne):
+    MFG[i] = (MAG[i]).dot(MU[i])
+    
+F = np.concatenate((F0, F1), axis=0)
+
+N = L + F
+
+
+#Matriz de almacenamiento de los vectores N de cada elemento
+MN = np.zeros((Ne,GLE,1))
+
+i = 0
+for i in range(Ne):
+    MN[i] = MLG[i] + MFG[i]
+
+    
+MFL = np.zeros((Ne,GLE,1))
+
+i = 0
+for i in range(Ne):
+    MFL[i] = MATT[i].dot(MN[i])
