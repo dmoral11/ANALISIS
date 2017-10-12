@@ -11,7 +11,7 @@ import xlrd               #Libreria para leer datos de excel
 #Este es el programa para cerchas
 #Datos de entrada
 
-doc = xlrd.open_workbook('Cercha_4.xlsx')
+doc = xlrd.open_workbook('Cercha_1.xlsx')
 worksheet = doc.sheet_by_name('Hoja1')
 
 Nnodos = worksheet.cell(1,1)
@@ -112,7 +112,7 @@ F0 = np.zeros((NGLL,1))
 
 i = 0
 for i in range (NGLL):
-    F0[i,0] = worksheet.cell_value(20+i,1)
+    F0[i,0] = worksheet.cell_value(6+i,14)
 
 
 
@@ -121,7 +121,7 @@ U1 = np.zeros((NGLR,1))
 
 i = 0
 for i in range (NGLR):
-    U1[i,0] = worksheet.cell_value(29+i,2)
+    U1[i,0] = worksheet.cell_value(NGLL+6+i,15)
     
 Feff = F0 - ((K1).dot(U1))
 
@@ -159,6 +159,8 @@ FELEM = np.zeros((Ne,1))
 i = 0
 for i in range(Ne):
     FELEM[i,0] = -MFL[i,0,0]
+
+    
 
 
 
